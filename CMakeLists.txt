@@ -1,0 +1,85 @@
+cmake_minimum_required(VERSION 3.21)
+
+project(RiverMeshLofting LANGUAGES CXX CUDA)
+
+# --- Instructions for vcpkg ---
+# To build with libraries from vcpkg (GLEW, GLFW), you MUST configure
+# CMake with the vcpkg toolchain file. In your IDE settings or when
+# running cmake from the command line, add this argument:
+#
+#   -DCMAKE_TOOLCHAIN_FILE="C:/path/to/your/vcpkg/scripts/buildsystems/vcpkg.cmake"
+#
+# Replace the path with the actual location of your vcpkg installation.
+# In VS Code, set this in the "cmake.configureArgs" setting.
+
+# --- Set Standards ---
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CUDA_STANDARD 17)
+set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
+# Detect GPU architecture automatically. For broader compatibility, you could
+# also set this explicitly, e.g., "75;86" for Ampere and Turing.
+set(CMAKE_CUDA_ARCHITECTURES native)
+
+# --- Find Dependencies ---
+# Find CUDA Toolkit to ensure CUDA::cudart target is available
+find_package(CUDAToolkit REQUIRED)
+
+# Find GLEW and GLFW3 (provided by vcpkg)
+find_package(GLEW REQUIRED)
+find_package(glfw3 REQUIRED)
+
+# Add GLM from the vendor directory. This creates the 'glm' target.
+add_subdirectory(vendor/glm)
+
+# --- Project Sources ---
+# Gather all source and header files from the src directory.
+file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.cu")
+file(GLOB_RECURSE HEADERS "src/*.hpp" "src/*.cuh")
+
+# --- Executable Target ---
+add_executable(river_mesh_lofting ${SOURCES} ${HEADERS})
+
+# --- Include Directories ---
+# The only include path we need to add manually is for our own source directory.
+# Include paths for GLEW, GLFW, GLM, and CUDA are handled automatically
+# by linking their respective CMake targets.
+target_include_directories(river_mesh_lofting PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
+# --- Link Libraries ---
+# Link against all required libraries. Using the imported targets
+# (GLEW::glew, glfw, glm) is the modern way and handles dependencies correctly.
+target_link_libraries(river_mesh_lofting PRIVATE
+    # OpenGL libraries
+    GLEW::glew
+    glfw
+
+    # Math library
+    glm
+
+    # CUDA runtime library
+    CUDA::cudart
+)
+
+# --- Platform-Specific Settings ---
+if(WIN32)
+    # This definition is required by GLEW on Windows when linking statically.
+    # vcpkg typically provides a static build of GLEW.
+    target_compile_definitions(river_mesh_lofting PRIVATE GLEW_STATIC)
+endif()
+
+# --- Post-Build Actions ---
+# Copy the shaders directory to the build output directory so the
+# executable can find the shader files at runtime.
+file(COPY shaders DESTINATION ${CMAKE_BINARY_DIR})
+
+# Set the output directory for the executable for consistency.
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+
+# --- User-Friendly Messages ---
+message(STATUS "Project '${PROJECT_NAME}' configured successfully.")
+message(STATUS "Build with: cmake --build .")
+message(STATUS "Run from the build directory.")
