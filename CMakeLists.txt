@@ -67,19 +67,24 @@ target_link_libraries(river_mesh_lofting PRIVATE
 # --- Platform-Specific Settings ---
 if(WIN32)
     # This definition is required by GLEW on Windows when linking statically.
-    # vcpkg typically provides a static build of GLEW.
-    target_compile_definitions(river_mesh_lofting PRIVATE GLEW_STATIC)
+    # vcpkg typically provides a static build of GLEW. If you get linker
+    # errors about __glew..., it is likely installed as a shared library and
+    # this definition should be removed or commented out.
+    # target_compile_definitions(river_mesh_lofting PRIVATE GLEW_STATIC)
 endif()
 
 # --- Post-Build Actions ---
-# Copy the shaders directory to the build output directory so the
-# executable can find the shader files at runtime.
-file(COPY shaders DESTINATION ${CMAKE_BINARY_DIR})
-
-# Set the output directory for the executable for consistency.
-set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+# Copy the shaders directory to the executable's output directory.
+# This uses a post-build command which is aware of the build configuration
+# (e.g., Debug, Release) and ensures the shaders are in the right place.
+add_custom_command(TARGET river_mesh_lofting POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    "${CMAKE_SOURCE_DIR}/shaders"
+    "$<TARGET_FILE_DIR:river_mesh_lofting>/shaders"
+    COMMENT "Copying shaders to output directory..."
+)
 
 # --- User-Friendly Messages ---
 message(STATUS "Project '${PROJECT_NAME}' configured successfully.")
 message(STATUS "Build with: cmake --build .")
-message(STATUS "Run from the build directory.")
+message(STATUS "Run the executable from its output directory (e.g., build/Debug or build/Release).")

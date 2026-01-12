@@ -1,3 +1,4 @@
+#include <GL/glew.h>
 #include "simulation.cuh"
 
 #include <cuda_runtime.h>

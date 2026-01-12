@@ -38,8 +38,8 @@ void main() {
     displacedPos.y += h;
 
     // Expand the surface width-wise based on the bank slope
-    // aTexCoords.v is 0.0 for Left edge and 1.0 for Right edge
-    float sideSign = (aTexCoords.v > 0.5) ? 1.0 : -1.0;
+    // aTexCoords.y is 0.0 for Left edge and 1.0 for Right edge
+    float sideSign = (aTexCoords.y > 0.5) ? 1.0 : -1.0;
     
     // Assuming the river flows primarily along Z, 'Right' is along X.
     // For a more robust solution, you could pass the 'Right' vector as a vertex attribute.
