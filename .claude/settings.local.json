@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(if exist \"src\\\\particle_system.cu\" del \"src\\\\particle_system.cu\")",
+      "Bash(dir:*)"
+    ]
+  }
+}

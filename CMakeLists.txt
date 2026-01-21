@@ -38,6 +38,10 @@ add_subdirectory(vendor/glm)
 file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.cu")
 file(GLOB_RECURSE HEADERS "src/*.hpp" "src/*.cuh")
 
+# Remove old particle files (replaced by particle_kernels.cu + particle_system_host.cu)
+list(FILTER SOURCES EXCLUDE REGEX ".*particle_system\\.cu$")
+list(FILTER SOURCES EXCLUDE REGEX ".*particle_system\\.cpp$")
+
 # --- Executable Target ---
 add_executable(river_mesh_lofting ${SOURCES} ${HEADERS})
 
@@ -47,6 +51,29 @@ add_executable(river_mesh_lofting ${SOURCES} ${HEADERS})
 # by linking their respective CMake targets.
 target_include_directories(river_mesh_lofting PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
+# --- CUDA Specific Settings ---
+# Set CUDA flags to properly handle device code compilation
+set_target_properties(river_mesh_lofting PROPERTIES
+    CUDA_SEPARABLE_COMPILATION ON
+    CUDA_RESOLVE_DEVICE_SYMBOLS ON
+)
+
+# CUDA compiler flags to handle OpenGL headers properly
+if(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA")
+    target_compile_options(river_mesh_lofting PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:
+            --expt-relaxed-constexpr
+            --extended-lambda
+            -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored
+        >
+    )
+endif()
+
+# Add CUDA include directories
+target_include_directories(river_mesh_lofting PRIVATE
+    ${CUDAToolkit_INCLUDE_DIRS}
 )
 
 # --- Link Libraries ---
@@ -62,6 +89,7 @@ target_link_libraries(river_mesh_lofting PRIVATE
 
     # CUDA runtime library
     CUDA::cudart
+    CUDA::curand
 )
 
 # --- Platform-Specific Settings ---

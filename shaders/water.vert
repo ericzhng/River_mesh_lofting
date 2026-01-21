@@ -9,6 +9,7 @@ layout (location = 3) in float aSimIndex;   // The index 'i' in the 1D simulatio
 // Simulation Data from CUDA
 uniform samplerBuffer uSimData; // Pack: [h1, u1, 0, 0, h2, u2, 0, 0, ...]
 uniform float uBankSlope;       // Horizontal distance per 1 unit of height
+uniform float uTime;            // For animated waves
 
 // Camera Matrices
 uniform mat4 uView;
@@ -18,37 +19,81 @@ uniform mat4 uModel;
 // Outputs to Fragment Shader
 out vec2 vTexCoords;
 out float vVelocity;
+out float vDepth;
 out vec3 vWorldPos;
+out vec3 vNormal;
+out vec3 vViewPos;
+out vec3 vTangent;
+out vec3 vBitangent;
+
+// Procedural wave function
+vec3 calculateWaves(vec3 pos, float velocity, out vec3 normal) {
+    vec3 wavePos = pos;
+
+    // Base wave parameters influenced by velocity
+    float waveSpeed = 0.5 + abs(velocity) * 0.3;
+    float waveFreq = 2.0 + abs(velocity) * 0.5;
+    float waveAmp = 0.05 + abs(velocity) * 0.02;
+
+    // Primary wave (flow direction)
+    float wave1 = sin(pos.z * waveFreq + uTime * waveSpeed) * waveAmp;
+
+    // Secondary wave (perpendicular)
+    float wave2 = sin(pos.x * waveFreq * 0.7 + uTime * waveSpeed * 0.8) * waveAmp * 0.5;
+
+    // Tertiary detail waves
+    float wave3 = sin((pos.z + pos.x) * waveFreq * 2.0 + uTime * waveSpeed * 1.5) * waveAmp * 0.3;
+
+    wavePos.y += wave1 + wave2 + wave3;
+
+    // Calculate normal using derivatives
+    float dx = waveAmp * 0.5 * cos(pos.x * waveFreq * 0.7 + uTime * waveSpeed * 0.8) * waveFreq * 0.7;
+    dx += waveAmp * 0.3 * cos((pos.z + pos.x) * waveFreq * 2.0 + uTime * waveSpeed * 1.5) * waveFreq * 2.0;
+
+    float dz = waveAmp * cos(pos.z * waveFreq + uTime * waveSpeed) * waveFreq;
+    dz += waveAmp * 0.3 * cos((pos.z + pos.x) * waveFreq * 2.0 + uTime * waveSpeed * 1.5) * waveFreq * 2.0;
+
+    normal = normalize(vec3(-dx, 1.0, -dz));
+
+    return wavePos;
+}
 
 void main() {
     // 1. Fetch simulation results for this specific river segment
-    // texelFetch pulls data from the buffer at the specific integer index
     vec4 simResults = texelFetch(uSimData, int(aSimIndex));
     float h = simResults.x;         // Water Depth
     float velocity = simResults.y;  // Flow Velocity
 
-    // 2. Calculate the "Expansion" vector
-    // We need to know which way is 'Right' relative to the river flow.
-    // In our C++ mesh, we already baked the 'Right' direction logic into the geometry,
-    // but here we simply displace based on whether we are the Left or Right vertex.
-    
     vec3 displacedPos = aPos;
-    
+
     // Lift the water to the current depth
     displacedPos.y += h;
 
     // Expand the surface width-wise based on the bank slope
-    // aTexCoords.y is 0.0 for Left edge and 1.0 for Right edge
     float sideSign = (aTexCoords.y > 0.5) ? 1.0 : -1.0;
-    
-    // Assuming the river flows primarily along Z, 'Right' is along X.
-    // For a more robust solution, you could pass the 'Right' vector as a vertex attribute.
     displacedPos.x += sideSign * (h * uBankSlope);
 
-    // 3. Output to Fragment Shader
+    // Add procedural waves
+    vec3 waveNormal;
+    displacedPos = calculateWaves(displacedPos, velocity, waveNormal);
+
+    // Calculate tangent space for normal mapping
+    vec3 tangent = normalize(vec3(0, 0, 1));  // Flow direction
+    vec3 bitangent = normalize(cross(waveNormal, tangent));
+    tangent = cross(bitangent, waveNormal);
+
+    // Output to Fragment Shader
     vTexCoords = aTexCoords;
     vVelocity = velocity;
+    vDepth = h;
     vWorldPos = vec3(uModel * vec4(displacedPos, 1.0));
+    vNormal = normalize(mat3(uModel) * waveNormal);
+    vTangent = normalize(mat3(uModel) * tangent);
+    vBitangent = normalize(mat3(uModel) * bitangent);
 
-    gl_Position = uProjection * uView * vec4(vWorldPos, 1.0);
+    // View position for Fresnel calculation
+    vec4 viewPos = uView * vec4(vWorldPos, 1.0);
+    vViewPos = viewPos.xyz;
+
+    gl_Position = uProjection * viewPos;
 }

@@ -1,0 +1,12 @@
+This file is a reminder that src/particle_system.cu should be DELETED.
+
+It has been replaced by:
+- src/particle_kernels.cu (CUDA device code)
+- src/particle_system.cpp (OpenGL host code)
+
+The CMakeLists.txt filters out particle_system.cu, but you should delete it manually for cleanliness.
+
+To delete:
+  Windows PowerShell: Remove-Item src\particle_system.cu
+  Windows CMD:        del src\particle_system.cu
+  Linux/Mac:          rm src/particle_system.cu
